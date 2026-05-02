@@ -1,67 +1,626 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ma Sói Online - PeerJS</title>
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: radial-gradient(circle at top, #26314d, #0b1020 60%);
-      color: #f4f6ff;
-      min-height: 100vh;
+import React, { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const weirdIcons = [
+  "🪩", "🧿", "🫧", "🛸", "🪬", "🧃", "🦄", "🐉", "🦖", "🦕", "🫨", "🤯",
+  "😈", "👽", "🤖", "🧌", "🧙", "🧛", "🧟", "🥷", "🫰", "🫶", "🫵", "🤌",
+  "💥", "💫", "🌪️", "🔥", "⚡", "☄️", "🌈", "🌙", "⭐", "🍄", "🌵", "🌊",
+  "🍕", "🍟", "🍜", "🍣", "🍩", "🍭", "🥤", "🧋", "🎮", "🎧", "🎲", "🎯",
+  "🚀", "🏆", "💎", "🔮", "🧸", "🎁", "🪄", "🧨", "🦾", "👑", "🕶️", "💀",
+];
+
+const stickerPacks = [
+  { id: "cool", name: "Ngầu", items: ["😎🔥", "👑✨", "🕶️💥", "💎🧊", "🚀🌙", "⚡😈"] },
+  { id: "cute", name: "Dễ thương", items: ["🥺👉👈", "🐣💛", "🧸💕", "🌷😊", "🐰🍓", "🫶✨"] },
+  { id: "meme", name: "Meme", items: ["💀💀💀", "🤡🎪", "🗿☕", "🤯📈", "😭👌", "😼📸"] },
+  { id: "vibe", name: "Vibe", items: ["🌌🪐", "🌊🫧", "🍄🌈", "☄️💫", "🪩🎧", "🌙⭐"] },
+  { id: "battle", name: "Chiến", items: ["⚔️🔥", "🛡️👊", "🐉⚡", "🥷🌑", "🏆💥", "🧨😈"] },
+  { id: "love", name: "Tim", items: ["💖✨", "💘🥺", "💞🫶", "❤️‍🔥😳", "💕🌷", "💝🎁"] },
+];
+
+const quickTexts = [
+  "Hello cả phòng 👋",
+  "Ai online không? 👀",
+  "Quá cháy luôn 🔥",
+  "Từ từ để mình rep 😭",
+  "Ok nè ✅",
+  "Haha vui quá 🤣",
+];
+
+const TEST_CASES = [
+  { input: " Lớp 7A!! ", expected: "lp7a", reason: "lọc ký tự tiếng Việt/dấu và ký tự đặc biệt để PeerJS ID an toàn" },
+  { input: "room_123-abc", expected: "room_123-abc", reason: "giữ chữ thường, số, gạch dưới và gạch ngang" },
+  { input: "ABC DEF", expected: "abcdef", reason: "xóa khoảng trắng và chuyển về chữ thường" },
+  { input: "012345678901234567890123456789", expected: "012345678901234567890123", reason: "giới hạn mã phòng 24 ký tự" },
+];
+
+function normalizeRoomCode(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "")
+    .slice(0, 24);
+}
+
+function makeHostId(code) {
+  return `room-${code}-host`;
+}
+
+function uid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function Icon({ children, className = "", size = "text-base" }) {
+  return <span className={`inline-flex items-center justify-center leading-none ${size} ${className}`}>{children}</span>;
+}
+
+function runSelfTests() {
+  TEST_CASES.forEach((test) => {
+    const actual = normalizeRoomCode(test.input);
+    console.assert(actual === test.expected, `normalizeRoomCode failed: ${test.reason}. Expected ${test.expected}, got ${actual}`);
+  });
+  console.assert(makeHostId("abc") === "room-abc-host", "makeHostId should create the fixed host peer id");
+  console.assert(stickerPacks.every((pack) => pack.items.length >= 6), "Each sticker pack should have at least 6 stickers");
+}
+
+export default function PeerRoomChatApp() {
+  const [roomCode, setRoomCode] = useState("");
+  const [myName, setMyName] = useState(() => `User-${Math.floor(Math.random() * 900 + 100)}`);
+  const [joined, setJoined] = useState(false);
+  const [status, setStatus] = useState("Chưa vào phòng");
+  const [online, setOnline] = useState(false);
+  const [peerId, setPeerId] = useState("");
+  const [hostId, setHostId] = useState("");
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelTab, setPanelTab] = useState("icons");
+  const [activePack, setActivePack] = useState("cool");
+
+  const peerRef = useRef(null);
+  const connsRef = useRef({});
+  const isHostRef = useRef(false);
+  const roomRef = useRef("");
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    runSelfTests();
+  }, []);
+
+  const addMessage = (msg) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: uid(),
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        ...msg,
+      },
+    ]);
+  };
+
+  const scrollToBottom = () => {
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
+
+  useEffect(scrollToBottom, [messages]);
+
+  const broadcast = (data, exceptPeerId = null) => {
+    Object.entries(connsRef.current).forEach(([id, conn]) => {
+      if (id !== exceptPeerId && conn.open) conn.send(data);
+    });
+  };
+
+  const updateUsers = () => {
+    const list = [
+      { id: peerRef.current?.id || "", name: myName, host: isHostRef.current },
+      ...Object.values(connsRef.current)
+        .filter((conn) => conn.open && conn.metadata?.name)
+        .map((conn) => ({ id: conn.peer, name: conn.metadata.name, host: false })),
+    ];
+
+    setUsers(list);
+    if (isHostRef.current) broadcast({ type: "users", users: list });
+  };
+
+  const setupConnection = (conn) => {
+    connsRef.current[conn.peer] = conn;
+
+    conn.on("open", () => {
+      setOnline(true);
+      addMessage({ type: "system", text: `${conn.metadata?.name || conn.peer} đã online.` });
+      updateUsers();
+
+      if (!isHostRef.current) {
+        conn.send({ type: "hello", name: myName });
+      } else {
+        const hostUser = { id: peerRef.current?.id || "", name: myName, host: true };
+        conn.send({ type: "users", users: [hostUser] });
+      }
+    });
+
+    conn.on("data", (data) => {
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "chat" || data.type === "sticker") {
+        addMessage({
+          type: data.type,
+          from: data.from,
+          text: data.text,
+          mine: false,
+          stickerPack: data.stickerPack,
+        });
+        if (isHostRef.current) broadcast(data, conn.peer);
+      }
+
+      if (data.type === "hello") {
+        conn.metadata = { ...conn.metadata, name: data.name };
+        updateUsers();
+      }
+
+      if (data.type === "users") {
+        setUsers(data.users || []);
+      }
+    });
+
+    conn.on("close", () => {
+      addMessage({ type: "system", text: `${conn.metadata?.name || conn.peer} đã offline.` });
+      delete connsRef.current[conn.peer];
+      updateUsers();
+    });
+
+    conn.on("error", () => {
+      addMessage({ type: "system", text: "Kết nối gặp lỗi." });
+    });
+  };
+
+  const loadPeerJs = async () => {
+    if (window.Peer) return true;
+
+    setStatus("Đang tải PeerJS...");
+
+    const existingScript = document.querySelector('script[data-peerjs="true"]');
+    if (existingScript) {
+      await new Promise((resolve) => {
+        existingScript.addEventListener("load", resolve, { once: true });
+        existingScript.addEventListener("error", resolve, { once: true });
+      });
+      return Boolean(window.Peer);
     }
-    .app {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 18px;
+
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
+    script.async = true;
+    script.dataset.peerjs = "true";
+    document.body.appendChild(script);
+
+    await new Promise((resolve) => {
+      script.onload = resolve;
+      script.onerror = resolve;
+    });
+
+    if (!window.Peer) {
+      setStatus("Không tải được PeerJS. Kiểm tra mạng hoặc CDN.");
+      return false;
     }
-    h1, h2, h3 { margin: 0 0 12px; }
-    .card {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 18px;
-      padding: 16px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
-      backdrop-filter: blur(10px);
+
+    return true;
+  };
+
+  const joinRoom = async () => {
+    const code = normalizeRoomCode(roomCode);
+    if (!code) {
+      setStatus("Nhập mã phòng trước đã nhé.");
+      return;
     }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
+
+    const peerReady = await loadPeerJs();
+    if (!peerReady) return;
+
+    roomRef.current = code;
+    const fixedHostId = makeHostId(code);
+    setHostId(fixedHostId);
+    setMessages([]);
+    setUsers([]);
+    connsRef.current = {};
+
+    const peer = new window.Peer(fixedHostId, { debug: 1 });
+    peerRef.current = peer;
+    setStatus("Đang vào phòng...");
+
+    peer.on("open", (id) => {
+      isHostRef.current = true;
+      setPeerId(id);
+      setJoined(true);
+      setOnline(true);
+      setStatus(`Bạn đang là chủ phòng: ${code}`);
+      addMessage({ type: "system", text: `Đã tạo phòng ${code}. Người khác nhập cùng mã để chat.` });
+      updateUsers();
+    });
+
+    peer.on("connection", setupConnection);
+
+    peer.on("error", (err) => {
+      if (err.type === "unavailable-id") {
+        peer.destroy();
+        isHostRef.current = false;
+
+        const clientPeer = new window.Peer(undefined, { debug: 1 });
+        peerRef.current = clientPeer;
+
+        clientPeer.on("open", (id) => {
+          setPeerId(id);
+          setJoined(true);
+          setOnline(true);
+          setStatus(`Đã vào phòng: ${code}`);
+          const conn = clientPeer.connect(fixedHostId, { reliable: true, metadata: { name: myName } });
+          setupConnection(conn);
+          addMessage({ type: "system", text: `Đã kết nối tới phòng ${code}.` });
+        });
+
+        clientPeer.on("error", () => {
+          setOnline(false);
+          setStatus("Không kết nối được phòng. Hãy thử lại hoặc tạo mã khác.");
+        });
+      } else {
+        setOnline(false);
+        setStatus(`Lỗi PeerJS: ${err.type || "không rõ"}`);
+      }
+    });
+  };
+
+  const leaveRoom = () => {
+    Object.values(connsRef.current).forEach((conn) => conn.close());
+    connsRef.current = {};
+    peerRef.current?.destroy();
+    peerRef.current = null;
+    isHostRef.current = false;
+    setJoined(false);
+    setOnline(false);
+    setPeerId("");
+    setHostId("");
+    setUsers([]);
+    setPanelOpen(false);
+    setStatus("Đã rời phòng");
+  };
+
+  const sendPayload = (payload) => {
+    if (!joined) return;
+
+    addMessage({ ...payload, mine: true });
+
+    const networkPayload = {
+      type: payload.type,
+      from: myName,
+      text: payload.text,
+      stickerPack: payload.stickerPack,
+    };
+
+    if (isHostRef.current) {
+      broadcast(networkPayload);
+    } else {
+      const hostConn = Object.values(connsRef.current)[0];
+      if (hostConn?.open) hostConn.send(networkPayload);
+      else addMessage({ type: "system", text: "Chưa có kết nối tới chủ phòng." });
     }
-    .row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
+  };
+
+  const sendMessage = () => {
+    const text = message.trim();
+    if (!text || !joined) return;
+    sendPayload({ type: "chat", from: myName, text });
+    setMessage("");
+  };
+
+  const sendSticker = (text, stickerPack = "custom") => {
+    if (!joined) return;
+    sendPayload({ type: "sticker", from: myName, text, stickerPack });
+  };
+
+  const addIconToInput = (icon) => {
+    setMessage((prev) => `${prev}${prev ? " " : ""}${icon}`);
+  };
+
+  const copyRoom = async () => {
+    const code = normalizeRoomCode(roomCode);
+    if (!code) return;
+    try {
+      await navigator.clipboard?.writeText(code);
+      addMessage({ type: "system", text: `Đã copy mã phòng: ${code}` });
+    } catch {
+      addMessage({ type: "system", text: `Mã phòng của bạn: ${code}` });
     }
-    input, select, button, textarea {
-      font: inherit;
-      border: 0;
-      border-radius: 12px;
-      padding: 11px 12px;
-    }
-    input, select, textarea {
-      background: rgba(255, 255, 255, 0.92);
-      color: #111827;
-      min-width: 0;
-    }
-    input { flex: 1; }
-    button {
-      background: #ffd166;
-      color: #231f20;
-      cursor: pointer;
-      font-weight: 700;
-      transition: transform 0.12s, opacity 0.12s;
-    }
-    button:hover { transform: translateY(-1px); }
-    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-    .danger { background: #ff6b6b; color: white; }
-    .ok { background: #6ee7b7; color: #063828; }
+  };
+
+  const currentPack = stickerPacks.find((pack) => pack.id === activePack) || stickerPacks[0];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 text-slate-100 p-4 sm:p-6 flex items-center justify-center">
+      <div className="w-full max-w-6xl grid lg:grid-cols-[350px_1fr] gap-4">
+        <motion.aside
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl p-5 backdrop-blur"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-11 w-11 rounded-2xl bg-cyan-500/15 flex items-center justify-center">
+              {online ? <Icon size="text-xl">📶</Icon> : <Icon size="text-xl">📴</Icon>}
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">PeerJS Room Chat</h1>
+              <p className="text-sm text-slate-400">Chat P2P bằng mã phòng</p>
+            </div>
+          </div>
+
+          <label className="text-sm text-slate-300">Tên của bạn</label>
+          <input
+            value={myName}
+            disabled={joined}
+            onChange={(e) => setMyName(e.target.value)}
+            className="mt-2 mb-4 w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-cyan-400 disabled:opacity-60"
+            placeholder="Nhập tên"
+          />
+
+          <label className="text-sm text-slate-300">Mã phòng</label>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={roomCode}
+              disabled={joined}
+              onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
+              onKeyDown={(e) => e.key === "Enter" && !joined && joinRoom()}
+              className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-cyan-400 disabled:opacity-60"
+              placeholder="vd: lop7a"
+            />
+            <button onClick={copyRoom} className="rounded-xl bg-slate-800 hover:bg-slate-700 px-3" title="Copy mã phòng">
+              <Icon size="text-lg">📋</Icon>
+            </button>
+          </div>
+
+          {!joined ? (
+            <button
+              onClick={joinRoom}
+              className="mt-4 w-full rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-3 flex items-center justify-center gap-2"
+            >
+              <Icon>🚪</Icon> Vào / tạo phòng
+            </button>
+          ) : (
+            <button
+              onClick={leaveRoom}
+              className="mt-4 w-full rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold py-3 flex items-center justify-center gap-2"
+            >
+              <Icon>🏃</Icon> Rời phòng
+            </button>
+          )}
+
+          <div className="mt-5 rounded-2xl bg-slate-950 border border-slate-800 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-slate-400">Trạng thái</span>
+              <span className={`text-xs px-2 py-1 rounded-full ${online ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-700 text-slate-300"}`}>
+                {online ? "Online" : "Offline"}
+              </span>
+            </div>
+            <p className="mt-2 text-sm break-words">{status}</p>
+            {peerId && <p className="mt-2 text-xs text-slate-500 break-all">ID: {peerId}</p>}
+            {hostId && <p className="mt-1 text-xs text-slate-500 break-all">Host: {hostId}</p>}
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-slate-950 border border-slate-800 p-4">
+            <div className="flex items-center gap-2 mb-3 text-sm text-slate-300">
+              <Icon>👥</Icon> Người online ({users.length})
+            </div>
+            <div className="space-y-2">
+              {users.length === 0 ? (
+                <p className="text-sm text-slate-500">Chưa có ai trong phòng.</p>
+              ) : (
+                users.map((u) => (
+                  <div key={u.id || u.name} className="flex items-center justify-between rounded-xl bg-slate-900 px-3 py-2">
+                    <span className="text-sm truncate">{u.name}</span>
+                    {u.host && <span className="text-[11px] text-cyan-300">host</span>}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-gradient-to-br from-fuchsia-500/10 to-cyan-500/10 border border-fuchsia-400/20 p-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-fuchsia-200 mb-2">
+              <Icon>✨</Icon> Tính năng mới
+            </div>
+            <p className="text-sm text-slate-400">Gửi icon độc lạ, sticker cỡ lớn, tin nhắn nhanh và hiệu ứng bong bóng đẹp hơn.</p>
+          </div>
+        </motion.aside>
+
+        <motion.main
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl flex flex-col min-h-[720px] overflow-hidden backdrop-blur"
+        >
+          <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold">Tin nhắn</h2>
+              <p className="text-sm text-slate-400">Mã phòng: {normalizeRoomCode(roomCode) || "chưa có"}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setPanelOpen((v) => !v)}
+                className="rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-2 flex items-center gap-2 text-sm"
+              >
+                <Icon>{panelOpen ? "✖️" : "✨"}</Icon>
+                <span className="hidden sm:inline">Icon & Sticker</span>
+              </button>
+              <div className={`h-3 w-3 rounded-full ${online ? "bg-emerald-400" : "bg-slate-600"}`} />
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {panelOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-b border-slate-800 bg-slate-950/80 overflow-hidden"
+              >
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <button
+                      onClick={() => setPanelTab("icons")}
+                      className={`rounded-xl px-4 py-2 text-sm flex items-center gap-2 ${panelTab === "icons" ? "bg-cyan-500 text-slate-950 font-bold" : "bg-slate-800 text-slate-300"}`}
+                    >
+                      <Icon>😊</Icon> Icon độc lạ
+                    </button>
+                    <button
+                      onClick={() => setPanelTab("stickers")}
+                      className={`rounded-xl px-4 py-2 text-sm flex items-center gap-2 ${panelTab === "stickers" ? "bg-fuchsia-500 text-white font-bold" : "bg-slate-800 text-slate-300"}`}
+                    >
+                      <Icon>🏷️</Icon> Sticker đẹp
+                    </button>
+                    <button
+                      onClick={() => setPanelTab("quick")}
+                      className={`rounded-xl px-4 py-2 text-sm flex items-center gap-2 ${panelTab === "quick" ? "bg-amber-400 text-slate-950 font-bold" : "bg-slate-800 text-slate-300"}`}
+                    >
+                      <Icon>🪄</Icon> Gửi nhanh
+                    </button>
+                  </div>
+
+                  {panelTab === "icons" && (
+                    <div className="grid grid-cols-8 sm:grid-cols-12 md:grid-cols-16 gap-2">
+                      {weirdIcons.map((icon) => (
+                        <button
+                          key={icon}
+                          onClick={() => addIconToInput(icon)}
+                          className="h-11 rounded-xl bg-slate-900 hover:bg-cyan-500/20 border border-slate-800 hover:border-cyan-400 text-2xl transition"
+                          title="Thêm vào tin nhắn"
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {panelTab === "stickers" && (
+                    <div>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {stickerPacks.map((pack) => (
+                          <button
+                            key={pack.id}
+                            onClick={() => setActivePack(pack.id)}
+                            className={`rounded-full px-3 py-1 text-sm ${activePack === pack.id ? "bg-fuchsia-500 text-white" : "bg-slate-800 text-slate-300"}`}
+                          >
+                            {pack.name}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                        {currentPack.items.map((sticker) => (
+                          <button
+                            key={sticker}
+                            disabled={!joined}
+                            onClick={() => sendSticker(sticker, currentPack.id)}
+                            className="rounded-2xl min-h-24 bg-gradient-to-br from-slate-900 to-slate-800 hover:from-fuchsia-500/20 hover:to-cyan-500/20 border border-slate-700 hover:border-fuchsia-300 text-4xl disabled:opacity-40 shadow-lg transition"
+                            title="Gửi sticker"
+                          >
+                            {sticker}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {panelTab === "quick" && (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {quickTexts.map((text) => (
+                        <button
+                          key={text}
+                          disabled={!joined}
+                          onClick={() => sendPayload({ type: "chat", from: myName, text })}
+                          className="text-left rounded-xl bg-slate-900 hover:bg-amber-400/15 border border-slate-800 hover:border-amber-300 px-4 py-3 disabled:opacity-40"
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex-1 overflow-y-auto p-5 space-y-3">
+            <AnimatePresence initial={false}>
+              {messages.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-center text-slate-500">
+                  <p>Nhập mã phòng rồi bắt đầu nhắn tin. Bật bảng icon để gửi sticker siêu đẹp.</p>
+                </div>
+              ) : (
+                messages.map((msg) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    className={msg.type === "system" ? "text-center" : `flex ${msg.mine ? "justify-end" : "justify-start"}`}
+                  >
+                    {msg.type === "system" ? (
+                      <span className="inline-block text-xs text-slate-400 bg-slate-950 border border-slate-800 rounded-full px-3 py-1">{msg.text}</span>
+                    ) : msg.type === "sticker" ? (
+                      <div className={`max-w-[78%] rounded-[2rem] px-5 py-4 border shadow-xl ${msg.mine ? "bg-gradient-to-br from-cyan-400/25 to-fuchsia-500/25 border-cyan-300/40" : "bg-gradient-to-br from-slate-800 to-indigo-900 border-fuchsia-300/30"}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-bold opacity-80">{msg.from}</span>
+                          <span className="text-[11px] opacity-60">{msg.time}</span>
+                          <Icon size="text-xs">💖</Icon>
+                        </div>
+                        <div className="text-6xl sm:text-7xl leading-tight text-center px-3 py-2 drop-shadow-lg">{msg.text}</div>
+                      </div>
+                    ) : (
+                      <div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-lg ${msg.mine ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-100"}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold opacity-80">{msg.from}</span>
+                          <span className="text-[11px] opacity-60">{msg.time}</span>
+                        </div>
+                        <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                      </div>
+                    )}
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="p-4 border-t border-slate-800 bg-slate-950/60">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPanelOpen((v) => !v)}
+                className="rounded-xl bg-slate-800 hover:bg-slate-700 px-3 flex items-center justify-center"
+                title="Mở icon và sticker"
+              >
+                <Icon size="text-xl">😊</Icon>
+              </button>
+              <input
+                value={message}
+                disabled={!joined}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                className="flex-1 rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-cyan-400 disabled:opacity-50"
+                placeholder={joined ? "Nhập tin nhắn hoặc chọn icon..." : "Vào phòng trước để nhắn tin"}
+              />
+              <button
+                disabled={!joined || !message.trim()}
+                onClick={sendMessage}
+                className="rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-950 font-bold px-5 flex items-center gap-2"
+              >
+                <Icon>➤</Icon>
+                <span className="hidden sm:inline">Gửi</span>
+              </button>
+            </div>
+          </div>
+        </motion.main>
+      </div>
+    </div>
+  );
+}
     .blue { background: #93c5fd; color: #0b2850; }
     .muted { color: #b9c1d9; }
     .hidden { display: none !important; }
