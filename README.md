@@ -2,15 +2,424 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Peer from "peerjs";
 
 const STORAGE_KEYS = {
-  profile: "peer_chat_profile_v2",
-  friends: "peer_chat_friends_v2",
-  messages: "peer_chat_messages_v2",
+  profile: "peer_chat_profile_github_v1",
+  friends: "peer_chat_friends_github_v1",
+  messages: "peer_chat_messages_github_v1",
 };
 
 const EMPTY_PROFILE = {
   displayName: "",
   peerId: "",
 };
+
+const APP_CSS = `
+  :root {
+    color-scheme: dark;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    background: radial-gradient(circle at top left, #1f3b45 0, transparent 34%), #07111f;
+    color: #f8fafc;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+
+  .app-wrap {
+    width: min(1180px, 100%);
+    margin: 0 auto;
+  }
+
+  .app-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #a7f3d0;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  .title {
+    font-size: clamp(30px, 5vw, 48px);
+    line-height: 1.05;
+    margin: 14px 0 8px;
+    letter-spacing: -0.04em;
+  }
+
+  .subtitle {
+    color: #cbd5e1;
+    margin: 0;
+    max-width: 720px;
+    line-height: 1.55;
+  }
+
+  .status-card,
+  .panel {
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 22px;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+  }
+
+  .status-card {
+    min-width: 210px;
+    padding: 14px 16px;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  .muted-small {
+    color: #94a3b8;
+    font-size: 12px;
+    margin-top: 5px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 365px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .left-stack {
+    display: grid;
+    gap: 16px;
+  }
+
+  .panel-body {
+    padding: 16px;
+  }
+
+  .panel-title {
+    font-size: 18px;
+    margin: 0 0 12px;
+  }
+
+  .stack {
+    display: grid;
+    gap: 10px;
+  }
+
+  .label {
+    display: grid;
+    gap: 7px;
+    color: #cbd5e1;
+    font-size: 13px;
+  }
+
+  .input,
+  .textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    background: #020617;
+    color: #f8fafc;
+    padding: 11px 12px;
+    outline: none;
+    font: inherit;
+  }
+
+  .input:focus,
+  .textarea:focus {
+    border-color: #34d399;
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.16);
+  }
+
+  .input:disabled,
+  .textarea:disabled {
+    opacity: 0.62;
+    cursor: not-allowed;
+  }
+
+  .input-row,
+  .button-grid,
+  .friend-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+
+  .button-grid,
+  .friend-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .btn {
+    border: 0;
+    border-radius: 14px;
+    padding: 10px 12px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease, opacity 0.12s ease;
+    white-space: nowrap;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: #34d399;
+    color: #022c22;
+  }
+
+  .btn-secondary {
+    background: #1e293b;
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-danger {
+    background: rgba(248, 113, 113, 0.14);
+    color: #fecaca;
+    border: 1px solid rgba(248, 113, 113, 0.22);
+  }
+
+  .notice,
+  .empty,
+  .test-box,
+  .help-box {
+    background: #020617;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    color: #cbd5e1;
+    padding: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .help-box ul,
+  .help-box ol {
+    margin: 8px 0 0 18px;
+    padding: 0;
+  }
+
+  .help-box li {
+    margin: 5px 0;
+  }
+
+  .tiny-note {
+    color: #64748b;
+    font-size: 12px;
+    margin: 6px 0 0;
+    line-height: 1.45;
+  }
+
+  .friend-list {
+    display: grid;
+    gap: 9px;
+  }
+
+  .friend-card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    background: #020617;
+    padding: 10px;
+  }
+
+  .friend-card.selected {
+    border-color: #34d399;
+    background: rgba(52, 211, 153, 0.1);
+  }
+
+  .friend-main {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .friend-name {
+    font-weight: 750;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .friend-id {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #94a3b8;
+    font-size: 12px;
+    margin-top: 4px;
+    min-width: 0;
+  }
+
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-panel {
+    min-height: 760px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .chat-title {
+    margin: 0;
+    font-size: 22px;
+  }
+
+  .chat-subtitle {
+    color: #94a3b8;
+    margin: 4px 0 0;
+    font-size: 14px;
+  }
+
+  .chat-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .center-empty {
+    min-height: 500px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: #94a3b8;
+  }
+
+  .bubble-list {
+    display: grid;
+    gap: 11px;
+  }
+
+  .bubble-wrap {
+    display: flex;
+  }
+
+  .bubble-wrap.mine {
+    justify-content: flex-end;
+  }
+
+  .bubble-wrap.theirs {
+    justify-content: flex-start;
+  }
+
+  .bubble {
+    max-width: min(620px, 78%);
+    border-radius: 20px;
+    padding: 10px 13px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  }
+
+  .bubble.mine {
+    background: #34d399;
+    color: #022c22;
+  }
+
+  .bubble.theirs {
+    background: #1e293b;
+    color: #f8fafc;
+  }
+
+  .bubble-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.42;
+  }
+
+  .bubble-time {
+    font-size: 11px;
+    opacity: 0.72;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  .composer {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 16px;
+  }
+
+  .composer-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 9px;
+  }
+
+  .textarea {
+    min-height: 52px;
+    max-height: 150px;
+    resize: vertical;
+  }
+
+  .test-pass {
+    color: #86efac;
+  }
+
+  .test-fail {
+    color: #fca5a5;
+  }
+
+  .env-ok {
+    color: #86efac;
+  }
+
+  .env-warn {
+    color: #fde68a;
+  }
+
+  @media (max-width: 900px) {
+    .app-shell {
+      padding: 14px;
+    }
+
+    .app-header,
+    .layout {
+      grid-template-columns: 1fr;
+      display: grid;
+    }
+
+    .status-card {
+      min-width: 0;
+    }
+
+    .chat-panel {
+      min-height: 660px;
+    }
+  }
+`;
 
 function safeJsonParse(value, fallback) {
   try {
@@ -26,9 +435,833 @@ function loadStorage(key, fallback) {
 }
 
 function saveStorage(key, value) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeStorage(key) {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function nowLabel() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function normalizePeerId(value) {
+  return String(value || "").trim().replace(/\s+/g, "");
+}
+
+function sanitizeText(value, maxLength = 4000) {
+  return String(value || "").slice(0, maxLength);
+}
+
+function isValidIncomingData(data) {
+  return data !== null && typeof data === "object" && typeof data.type === "string";
+}
+
+function isSecureEnoughForWebRTC() {
+  if (typeof window === "undefined") return false;
+  const { protocol, hostname } = window.location;
+  return protocol === "https:" || hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function isLikelyGitHubPages() {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.endsWith("github.io");
+}
+
+function getEnvironmentChecks() {
+  const hasPeer = typeof Peer === "function";
+  const hasLocalStorage = typeof window !== "undefined" && "localStorage" in window;
+  const secure = isSecureEnoughForWebRTC();
+  const githubPages = isLikelyGitHubPages();
+
+  return [
+    {
+      name: "PeerJS dependency đã tải",
+      ok: hasPeer,
+      hint: hasPeer ? "OK" : "Cần chạy: npm install peerjs",
+    },
+    {
+      name: "localStorage có sẵn",
+      ok: hasLocalStorage,
+      hint: hasLocalStorage ? "OK" : "Trình duyệt đang chặn lưu dữ liệu cục bộ",
+    },
+    {
+      name: "HTTPS hoặc localhost cho WebRTC",
+      ok: secure,
+      hint: secure ? "OK" : "GitHub Pages có HTTPS; khi test local hãy dùng localhost",
+    },
+    {
+      name: "Tương thích GitHub Pages",
+      ok: secure && hasPeer,
+      hint: githubPages ? "Đang chạy trên github.io" : "Có thể deploy lên GitHub Pages nếu build bằng Vite/React",
+    },
+  ];
+}
+
+function makeLocalMessage(text) {
+  return {
+    id: createId(),
+    type: "message",
+    text: sanitizeText(text),
+    from: "me",
+    time: nowLabel(),
+    createdAt: Date.now(),
+  };
+}
+
+function makeRemoteMessage(data) {
+  return {
+    id: data.id || createId(),
+    text: sanitizeText(data.text),
+    from: "them",
+    time: data.time || nowLabel(),
+    createdAt: data.createdAt || Date.now(),
+  };
+}
+
+function makeHelloPayload(displayName, peerId) {
+  return {
+    type: "hello",
+    displayName: sanitizeText(displayName || "Người dùng PeerJS", 80),
+    peerId: normalizePeerId(peerId),
+  };
+}
+
+function dedupeFriends(friends) {
+  const seen = new Set();
+  const clean = [];
+
+  for (const friend of Array.isArray(friends) ? friends : []) {
+    const peerId = normalizePeerId(friend?.peerId);
+    if (!peerId || seen.has(peerId)) continue;
+    seen.add(peerId);
+    clean.push({
+      id: friend?.id || createId(),
+      peerId,
+      name: sanitizeText(friend?.name || peerId, 80),
+      createdAt: friend?.createdAt || Date.now(),
+    });
+  }
+
+  return clean;
+}
+
+function runSelfTests() {
+  const results = [];
+
+  function test(name, condition) {
+    results.push({ name, passed: Boolean(condition) });
+  }
+
+  test("normalizePeerId xóa khoảng trắng", normalizePeerId("  abc 123 \n") === "abc123");
+  test("safeJsonParse trả fallback khi JSON lỗi", safeJsonParse("{bad", { ok: true }).ok === true);
+  test("safeJsonParse đọc JSON hợp lệ", safeJsonParse('{"ok":true}', {}).ok === true);
+  test("isValidIncomingData nhận object có type", isValidIncomingData({ type: "message" }) === true);
+  test("isValidIncomingData từ chối null", isValidIncomingData(null) === false);
+  test("makeRemoteMessage ép text về string", makeRemoteMessage({ text: 123 }).text === "123");
+  test("makeLocalMessage có type message", makeLocalMessage("hi").type === "message");
+  test("sanitizeText giới hạn độ dài", sanitizeText("abcdef", 3) === "abc");
+  test("dedupeFriends bỏ bạn trùng Peer ID", dedupeFriends([{ peerId: "a" }, { peerId: "a" }]).length === 1);
+  test("makeHelloPayload có type hello", makeHelloPayload("Hải", "abc").type === "hello");
+
+  for (const check of getEnvironmentChecks()) {
+    test(check.name, check.ok);
+  }
+
+  return results;
+}
+
+function Button({ children, onClick, disabled, variant = "primary", title, type = "button" }) {
+  return (
+    <button type={type} title={title} className={`btn btn-${variant}`} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+}
+
+function Panel({ children, className = "" }) {
+  return <section className={`panel ${className}`}>{children}</section>;
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="label">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function TextInput(props) {
+  return <input {...props} className={`input ${props.className || ""}`} />;
+}
+
+export default function PeerJsMessengerApp() {
+  const [profile, setProfile] = useState(() => loadStorage(STORAGE_KEYS.profile, EMPTY_PROFILE));
+  const [friends, setFriends] = useState(() => dedupeFriends(loadStorage(STORAGE_KEYS.friends, [])));
+  const [messages, setMessages] = useState(() => loadStorage(STORAGE_KEYS.messages, {}));
+
+  const [peerStatus, setPeerStatus] = useState("idle");
+  const [myPeerId, setMyPeerId] = useState("");
+  const [selectedFriendId, setSelectedFriendId] = useState("");
+  const [connectPeerId, setConnectPeerId] = useState("");
+  const [friendName, setFriendName] = useState("");
+  const [draft, setDraft] = useState("");
+  const [notice, setNotice] = useState("Nhấn “Bật kết nối” để lấy mã Peer ID.");
+  const [onlineMap, setOnlineMap] = useState({});
+  const [testResults, setTestResults] = useState([]);
+  const [environmentChecks, setEnvironmentChecks] = useState([]);
+
+  const peerRef = useRef(null);
+  const connectionsRef = useRef({});
+  const bottomRef = useRef(null);
+  const profileRef = useRef(profile);
+  const myPeerIdRef = useRef(myPeerId);
+
+  useEffect(() => {
+    setEnvironmentChecks(getEnvironmentChecks());
+  }, []);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+
+  useEffect(() => {
+    myPeerIdRef.current = myPeerId;
+  }, [myPeerId]);
+
+  const selectedFriend = useMemo(
+    () => friends.find((friend) => friend.peerId === selectedFriendId) || null,
+    [friends, selectedFriendId]
+  );
+
+  const selectedMessages = selectedFriendId ? messages[selectedFriendId] || [] : [];
+
+  useEffect(() => saveStorage(STORAGE_KEYS.profile, profile), [profile]);
+  useEffect(() => saveStorage(STORAGE_KEYS.friends, friends), [friends]);
+  useEffect(() => saveStorage(STORAGE_KEYS.messages, messages), [messages]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [selectedFriendId, selectedMessages.length]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(connectionsRef.current).forEach((conn) => {
+        try {
+          conn.close();
+        } catch {
+          // Ignore close errors.
+        }
+      });
+      try {
+        peerRef.current?.destroy();
+      } catch {
+        // Ignore destroy errors.
+      }
+    };
+  }, []);
+
+  function addNotice(text) {
+    setNotice(text);
+  }
+
+  function upsertFriend(peerId, name = "") {
+    const cleanPeerId = normalizePeerId(peerId);
+    if (!cleanPeerId) return;
+
+    setFriends((current) => {
+      const exists = current.some((friend) => friend.peerId === cleanPeerId);
+      if (exists) {
+        return current.map((friend) =>
+          friend.peerId === cleanPeerId
+            ? { ...friend, name: sanitizeText(name || friend.name || cleanPeerId, 80) }
+            : friend
+        );
+      }
+
+      return [
+        ...current,
+        {
+          id: createId(),
+          peerId: cleanPeerId,
+          name: sanitizeText(name || `Bạn ${current.length + 1}`, 80),
+          createdAt: Date.now(),
+        },
+      ];
+    });
+
+    setSelectedFriendId(cleanPeerId);
+  }
+
+  function appendMessage(friendPeerId, message) {
+    setMessages((current) => ({
+      ...current,
+      [friendPeerId]: [...(current[friendPeerId] || []), message],
+    }));
+  }
+
+  function sendHello(conn) {
+    try {
+      conn.send(makeHelloPayload(profileRef.current.displayName, myPeerIdRef.current || peerRef.current?.id || ""));
+    } catch {
+      // Connection may close before hello is sent.
+    }
+  }
+
+  function attachConnection(conn) {
+    if (!conn || !conn.peer) return;
+
+    connectionsRef.current[conn.peer] = conn;
+    upsertFriend(conn.peer, conn.metadata?.displayName || "");
+
+    conn.on("open", () => {
+      connectionsRef.current[conn.peer] = conn;
+      setOnlineMap((current) => ({ ...current, [conn.peer]: true }));
+      addNotice(`Đã kết nối với ${conn.metadata?.displayName || conn.peer}.`);
+      sendHello(conn);
+    });
+
+    conn.on("data", (data) => {
+      if (!isValidIncomingData(data)) return;
+
+      if (data.type === "hello") {
+        setOnlineMap((current) => ({ ...current, [conn.peer]: true }));
+        upsertFriend(conn.peer, data.displayName || conn.peer);
+        return;
+      }
+
+      if (data.type === "message") {
+        const text = sanitizeText(data.text).trim();
+        if (!text) return;
+        setOnlineMap((current) => ({ ...current, [conn.peer]: true }));
+        upsertFriend(conn.peer, data.displayName || conn.peer);
+        appendMessage(conn.peer, makeRemoteMessage({ ...data, text }));
+        setSelectedFriendId((current) => current || conn.peer);
+      }
+    });
+
+    conn.on("close", () => {
+      setOnlineMap((current) => ({ ...current, [conn.peer]: false }));
+      addNotice(`Kết nối với ${conn.peer} đã đóng.`);
+    });
+
+    conn.on("error", () => {
+      setOnlineMap((current) => ({ ...current, [conn.peer]: false }));
+      addNotice("Có lỗi kết nối. Hãy kiểm tra Peer ID hoặc thử bật lại kết nối.");
+    });
+  }
+
+  function startPeer() {
+    if (peerRef.current && !peerRef.current.destroyed) {
+      addNotice("Kết nối đã bật rồi.");
+      return;
+    }
+
+    if (typeof Peer !== "function") {
+      setPeerStatus("error");
+      addNotice("PeerJS chưa tải được. Trên GitHub/Vite hãy chạy: npm install peerjs");
+      return;
+    }
+
+    if (!isSecureEnoughForWebRTC()) {
+      setPeerStatus("error");
+      addNotice("WebRTC cần HTTPS hoặc localhost. GitHub Pages dùng HTTPS nên deploy lên đó sẽ phù hợp hơn mở file trực tiếp.");
+      return;
+    }
+
+    setPeerStatus("connecting");
+    addNotice("Đang tạo Peer ID...");
+
+    try {
+      const preferredId = normalizePeerId(profile.peerId);
+      const peer = preferredId ? new Peer(preferredId, { debug: 1 }) : new Peer(undefined, { debug: 1 });
+      peerRef.current = peer;
+
+      peer.on("open", (id) => {
+        setMyPeerId(id);
+        setPeerStatus("online");
+        setProfile((current) => ({ ...current, peerId: id }));
+        addNotice("Đã sẵn sàng. Gửi Peer ID này cho bạn bè để họ kết nối.");
+      });
+
+      peer.on("connection", (conn) => {
+        attachConnection(conn);
+        addNotice(`${conn.peer} đang kết nối tới bạn.`);
+      });
+
+      peer.on("disconnected", () => {
+        setPeerStatus("offline");
+        addNotice("Peer bị ngắt. Hãy bấm “Tắt”, rồi “Bật kết nối” lại.");
+      });
+
+      peer.on("close", () => {
+        setPeerStatus("offline");
+        addNotice("Peer đã đóng.");
+      });
+
+      peer.on("error", (error) => {
+        setPeerStatus("error");
+        const message = error?.type === "unavailable-id"
+          ? "Peer ID này đang được dùng. Hãy đổi Peer ID khác hoặc để trống để app tự tạo ID."
+          : error?.type === "network"
+            ? "Lỗi mạng PeerJS. Hãy kiểm tra Internet rồi thử lại."
+            : error?.type === "peer-unavailable"
+              ? "Không tìm thấy Peer ID kia. Hãy kiểm tra máy kia đã bật kết nối chưa."
+              : "Không tạo được kết nối PeerJS. Hãy thử lại hoặc kiểm tra mạng.";
+        addNotice(message);
+      });
+    } catch {
+      setPeerStatus("error");
+      addNotice("Không khởi tạo được PeerJS. Hãy thử tải lại app.");
+    }
+  }
+
+  function stopPeer() {
+    Object.values(connectionsRef.current).forEach((conn) => {
+      try {
+        conn.close();
+      } catch {
+        // Ignore close errors.
+      }
+    });
+    connectionsRef.current = {};
+    setOnlineMap({});
+
+    try {
+      peerRef.current?.destroy();
+    } catch {
+      // Ignore destroy errors.
+    }
+
+    peerRef.current = null;
+    setPeerStatus("offline");
+    setMyPeerId("");
+    addNotice("Đã tắt kết nối.");
+  }
+
+  function connectToFriend(peerIdArg = connectPeerId, nameArg = friendName) {
+    const cleanPeerId = normalizePeerId(peerIdArg);
+
+    if (!peerRef.current || peerRef.current.destroyed || peerStatus !== "online") {
+      addNotice("Bạn cần nhấn “Bật kết nối” trước.");
+      return;
+    }
+
+    if (!cleanPeerId) {
+      addNotice("Hãy nhập Peer ID của người bạn muốn kết nối.");
+      return;
+    }
+
+    if (cleanPeerId === myPeerId) {
+      addNotice("Không thể tự kết nối với chính mình.");
+      return;
+    }
+
+    const existing = connectionsRef.current[cleanPeerId];
+    if (existing && existing.open) {
+      setSelectedFriendId(cleanPeerId);
+      addNotice("Bạn đã kết nối với người này rồi.");
+      return;
+    }
+
+    upsertFriend(cleanPeerId, nameArg || cleanPeerId);
+    addNotice("Đang kết nối...");
+
+    try {
+      const conn = peerRef.current.connect(cleanPeerId, {
+        reliable: true,
+        metadata: { displayName: sanitizeText(profile.displayName || "Người dùng PeerJS", 80) },
+      });
+      attachConnection(conn);
+      setConnectPeerId("");
+      setFriendName("");
+    } catch {
+      addNotice("Không thể bắt đầu kết nối. Hãy kiểm tra Peer ID.");
+    }
+  }
+
+  function sendMessage() {
+    const text = sanitizeText(draft).trim();
+    if (!text) return;
+
+    if (!selectedFriendId) {
+      addNotice("Hãy chọn một người bạn trước khi nhắn.");
+      return;
+    }
+
+    const conn = connectionsRef.current[selectedFriendId];
+    if (!conn || !conn.open) {
+      addNotice("Bạn này chưa online/kết nối. Nhấn “Nối” trước khi gửi.");
+      return;
+    }
+
+    const localMessage = makeLocalMessage(text);
+    const outgoingMessage = {
+      ...localMessage,
+      displayName: sanitizeText(profile.displayName || "Người dùng PeerJS", 80),
+    };
+
+    try {
+      conn.send(outgoingMessage);
+      appendMessage(selectedFriendId, {
+        id: localMessage.id,
+        text: localMessage.text,
+        from: "me",
+        time: localMessage.time,
+        createdAt: localMessage.createdAt,
+      });
+      setDraft("");
+    } catch {
+      addNotice("Gửi tin nhắn thất bại. Hãy kết nối lại rồi thử gửi lần nữa.");
+    }
+  }
+
+  function copyMyId() {
+    const value = myPeerId || profile.peerId;
+    if (!value) {
+      addNotice("Chưa có Peer ID để sao chép.");
+      return;
+    }
+
+    if (!navigator.clipboard) {
+      addNotice("Trình duyệt không hỗ trợ copy tự động. Hãy bôi đen Peer ID và copy thủ công.");
+      return;
+    }
+
+    navigator.clipboard
+      .writeText(value)
+      .then(() => addNotice("Đã sao chép Peer ID."))
+      .catch(() => addNotice("Không sao chép được. Hãy bôi đen và copy thủ công."));
+  }
+
+  function removeFriend(peerId) {
+    setFriends((current) => current.filter((friend) => friend.peerId !== peerId));
+    setMessages((current) => {
+      const next = { ...current };
+      delete next[peerId];
+      return next;
+    });
+
+    try {
+      connectionsRef.current[peerId]?.close();
+    } catch {
+      // Ignore close errors.
+    }
+    delete connectionsRef.current[peerId];
+
+    setOnlineMap((current) => {
+      const next = { ...current };
+      delete next[peerId];
+      return next;
+    });
+
+    if (selectedFriendId === peerId) setSelectedFriendId("");
+    addNotice("Đã xóa bạn và lịch sử chat trên máy này.");
+  }
+
+  function clearCurrentChat() {
+    if (!selectedFriendId) return;
+    setMessages((current) => ({ ...current, [selectedFriendId]: [] }));
+    addNotice("Đã xóa lịch sử chat với bạn này trên máy này.");
+  }
+
+  function clearAllLocalData() {
+    stopPeer();
+    setProfile(EMPTY_PROFILE);
+    setFriends([]);
+    setMessages({});
+    setSelectedFriendId("");
+    setConnectPeerId("");
+    setFriendName("");
+    setDraft("");
+    removeStorage(STORAGE_KEYS.profile);
+    removeStorage(STORAGE_KEYS.friends);
+    removeStorage(STORAGE_KEYS.messages);
+    addNotice("Đã xóa toàn bộ dữ liệu cục bộ của app trên máy này.");
+  }
+
+  function handleRunTests() {
+    const results = runSelfTests();
+    setTestResults(results);
+    setEnvironmentChecks(getEnvironmentChecks());
+    const failed = results.filter((result) => !result.passed).length;
+    addNotice(failed === 0 ? "Tất cả kiểm tra cơ bản đều đạt." : `Có ${failed} kiểm tra chưa đạt.`);
+  }
+
+  const statusText = {
+    idle: "Chưa bật",
+    connecting: "Đang bật",
+    online: "Online",
+    offline: "Offline",
+    error: "Lỗi",
+  }[peerStatus] || "Không rõ";
+
+  const onlineCount = Object.values(onlineMap).filter(Boolean).length;
+
+  return (
+    <div className="app-shell">
+      <style>{APP_CSS}</style>
+      <div className="app-wrap">
+        <header className="app-header">
+          <div>
+            <div className="badge">
+              <span>✓</span>
+              <span>GitHub Pages friendly · React + PeerJS</span>
+            </div>
+            <h1 className="title">Mini Messenger PeerJS</h1>
+            <p className="subtitle">
+              App nhắn tin 1-1 chạy frontend tĩnh. Deploy được lên GitHub Pages, không cần server riêng. Hai máy cần mở app cùng lúc để nhắn trực tiếp qua PeerJS/WebRTC.
+            </p>
+          </div>
+
+          <div className="status-card">
+            <div className="status-row">
+              <span>{peerStatus === "online" ? "🟢" : peerStatus === "connecting" ? "🟡" : peerStatus === "error" ? "🔴" : "⚪"}</span>
+              <span>Trạng thái:</span>
+              <strong>{statusText}</strong>
+            </div>
+            <div className="muted-small">Bạn online: {onlineCount}</div>
+          </div>
+        </header>
+
+        <div className="layout">
+          <div className="left-stack">
+            <Panel>
+              <div className="panel-body">
+                <h2 className="panel-title">Hồ sơ & kết nối</h2>
+
+                <div className="stack">
+                  <Field label="Tên hiển thị">
+                    <TextInput
+                      value={profile.displayName}
+                      onChange={(event) => setProfile((current) => ({ ...current, displayName: sanitizeText(event.target.value, 80) }))}
+                      placeholder="Ví dụ: Hải"
+                    />
+                  </Field>
+
+                  <Field label="Peer ID của bạn">
+                    <div className="input-row">
+                      <TextInput
+                        value={myPeerId || profile.peerId}
+                        onChange={(event) => setProfile((current) => ({ ...current, peerId: normalizePeerId(event.target.value) }))}
+                        disabled={peerStatus === "online" || peerStatus === "connecting"}
+                        placeholder="Để trống để app tự tạo ID"
+                      />
+                      <Button variant="secondary" onClick={copyMyId} title="Sao chép Peer ID">
+                        Copy
+                      </Button>
+                    </div>
+                    <p className="tiny-note">Nếu nhập ID riêng, hãy nhập trước khi bấm “Bật kết nối”. Nếu ID bị trùng, hãy đổi ID khác.</p>
+                  </Field>
+
+                  <div className="button-grid">
+                    <Button onClick={startPeer} disabled={peerStatus === "connecting" || peerStatus === "online"}>
+                      Bật kết nối
+                    </Button>
+                    <Button variant="secondary" onClick={stopPeer}>
+                      Tắt
+                    </Button>
+                  </div>
+
+                  <div className="notice">{notice}</div>
+                </div>
+              </div>
+            </Panel>
+
+            <Panel>
+              <div className="panel-body">
+                <h2 className="panel-title">＋ Kết bạn bằng Peer ID</h2>
+
+                <div className="stack">
+                  <TextInput value={friendName} onChange={(event) => setFriendName(sanitizeText(event.target.value, 80))} placeholder="Tên bạn bè, không bắt buộc" />
+                  <TextInput
+                    value={connectPeerId}
+                    onChange={(event) => setConnectPeerId(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") connectToFriend();
+                    }}
+                    placeholder="Nhập Peer ID của máy kia"
+                  />
+                  <Button onClick={() => connectToFriend()}>🔗 Kết nối / thêm bạn</Button>
+                </div>
+              </div>
+            </Panel>
+
+            <Panel>
+              <div className="panel-body">
+                <h2 className="panel-title">💬 Bạn bè</h2>
+
+                {friends.length === 0 ? (
+                  <div className="empty">Chưa có bạn bè. Hãy nhập Peer ID của máy khác để bắt đầu.</div>
+                ) : (
+                  <div className="friend-list">
+                    {friends.map((friend) => {
+                      const isSelected = selectedFriendId === friend.peerId;
+                      const isOnline = Boolean(onlineMap[friend.peerId]);
+
+                      return (
+                        <div key={friend.peerId} className={`friend-card ${isSelected ? "selected" : ""}`}>
+                          <button type="button" className="friend-main" onClick={() => setSelectedFriendId(friend.peerId)}>
+                            <div className="friend-name">{friend.name || friend.peerId}</div>
+                            <div className="friend-id">
+                              <span>{isOnline ? "🟢" : "⚪"}</span>
+                              <span className="truncate">{friend.peerId}</span>
+                            </div>
+                          </button>
+
+                          <div className="friend-actions" style={{ marginTop: 9 }}>
+                            <Button variant="secondary" onClick={() => connectToFriend(friend.peerId, friend.name)}>
+                              Nối
+                            </Button>
+                            <Button variant="danger" onClick={() => removeFriend(friend.peerId)}>
+                              Xóa
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel>
+              <div className="panel-body">
+                <h2 className="panel-title">🧪 Rà lỗi & môi trường</h2>
+                <div className="button-grid">
+                  <Button variant="secondary" onClick={handleRunTests}>Chạy test</Button>
+                  <Button variant="danger" onClick={clearAllLocalData}>Xóa dữ liệu</Button>
+                </div>
+
+                <div className="test-box" style={{ marginTop: 10 }}>
+                  {environmentChecks.length === 0 ? (
+                    <div>Đang kiểm tra môi trường...</div>
+                  ) : (
+                    environmentChecks.map((check) => (
+                      <div key={check.name} className={check.ok ? "env-ok" : "env-warn"}>
+                        {check.ok ? "✓" : "!"} {check.name}: {check.hint}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {testResults.length > 0 && (
+                  <div className="test-box" style={{ marginTop: 10 }}>
+                    {testResults.map((result) => (
+                      <div key={result.name} className={result.passed ? "test-pass" : "test-fail"}>
+                        {result.passed ? "✓" : "✕"} {result.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel>
+              <div className="panel-body">
+                <h2 className="panel-title">🚀 Deploy GitHub Pages</h2>
+                <div className="help-box">
+                  <ol>
+                    <li>Tạo app bằng Vite React.</li>
+                    <li>Cài dependency: <strong>npm install peerjs</strong>.</li>
+                    <li>Đưa component này vào <strong>src/App.jsx</strong>.</li>
+                    <li>Build: <strong>npm run build</strong>.</li>
+                    <li>Deploy thư mục <strong>dist</strong> lên GitHub Pages.</li>
+                  </ol>
+                  <p className="tiny-note">GitHub Pages dùng HTTPS nên phù hợp với WebRTC. Không mở file index.html trực tiếp bằng đường dẫn file://.</p>
+                </div>
+              </div>
+            </Panel>
+          </div>
+
+          <Panel className="chat-panel">
+            <div className="chat-head">
+              <div style={{ minWidth: 0 }}>
+                <h2 className="chat-title truncate">{selectedFriend ? selectedFriend.name || selectedFriend.peerId : "Chọn một người bạn"}</h2>
+                <p className="chat-subtitle truncate">
+                  {selectedFriend ? (onlineMap[selectedFriend.peerId] ? "Đang kết nối trực tiếp" : "Chưa kết nối / offline") : "Tin nhắn sẽ xuất hiện ở đây"}
+                </p>
+              </div>
+
+              <Button variant="secondary" onClick={clearCurrentChat} disabled={!selectedFriendId}>
+                Xóa chat
+              </Button>
+            </div>
+
+            <div className="chat-body">
+              {!selectedFriend ? (
+                <div className="center-empty">
+                  <div>
+                    <div style={{ fontSize: 56, marginBottom: 12 }}>💬</div>
+                    <p>Chọn bạn bè hoặc thêm Peer ID để bắt đầu nhắn.</p>
+                  </div>
+                </div>
+              ) : selectedMessages.length === 0 ? (
+                <div className="empty">Chưa có tin nhắn với người này. Cả hai máy cần đang mở app và đã kết nối.</div>
+              ) : (
+                <div className="bubble-list">
+                  {selectedMessages.map((message) => {
+                    const mine = message.from === "me";
+                    return (
+                      <div key={message.id} className={`bubble-wrap ${mine ? "mine" : "theirs"}`}>
+                        <div className={`bubble ${mine ? "mine" : "theirs"}`}>
+                          <div className="bubble-text">{message.text}</div>
+                          <div className="bubble-time">{message.time}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={bottomRef} />
+                </div>
+              )}
+            </div>
+
+            <div className="composer">
+              <div className="composer-row">
+                <textarea
+                  className="textarea"
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  placeholder={selectedFriend ? "Nhập tin nhắn..." : "Chọn bạn bè trước"}
+                  disabled={!selectedFriend}
+                />
+                <Button onClick={sendMessage} disabled={!selectedFriend || !draft.trim()}>
+                  Gửi
+                </Button>
+              </div>
+              <p className="tiny-note">Enter để gửi, Shift + Enter để xuống dòng. Tin nhắn chỉ lưu trên trình duyệt hiện tại.</p>
+            </div>
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}
   } catch {
     // Local storage can fail in private mode or when storage is full.
   }
