@@ -2,23 +2,42 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>PeerJS Room Chat</title>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
+    :root {
+      --bg: #020617;
+      --panel: #0f172a;
+      --panel2: #111827;
+      --border: rgba(148, 163, 184, 0.18);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --cyan: #22d3ee;
+      --pink: #d946ef;
+      --rose: #f43f5e;
+      --green: #34d399;
+      --amber: #fbbf24;
+    }
+
     * {
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      overflow-x: hidden;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
     }
 
     body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: Arial, sans-serif;
-      color: #f8fafc;
-      background: radial-gradient(circle at top left, #312e81, transparent 35%), linear-gradient(135deg, #020617, #0f172a, #111827);
-      display: flex;
-      justify-content: center;
-      padding: 18px;
+      background: radial-gradient(circle at top left, #312e81, transparent 34%), linear-gradient(135deg, #020617, #0f172a 55%, #111827);
     }
 
     button,
@@ -27,8 +46,1370 @@
     }
 
     button {
-      cursor: pointer;
       border: 0;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    input {
+      min-width: 0;
+      width: 100%;
+      border-radius: 15px;
+      background: #020617;
+      color: var(--text);
+      border: 1px solid #334155;
+      outline: none;
+      padding: 13px 14px;
+      font-size: 16px;
+    }
+
+    input:focus {
+      border-color: var(--cyan);
+    }
+
+    input:disabled {
+      opacity: 0.6;
+    }
+
+    .app {
+      width: 100%;
+      min-height: 100dvh;
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .card {
+      min-width: 0;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(12px);
+    }
+
+    .sidebar {
+      padding: 18px;
+      overflow: hidden;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .logo {
+      flex: 0 0 auto;
+      width: 44px;
+      height: 44px;
+      border-radius: 17px;
+      background: rgba(34, 211, 238, 0.14);
+      display: grid;
+      place-items: center;
+      font-size: 23px;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 21px;
+      line-height: 1.15;
+    }
+
+    h2 {
+      font-size: 18px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      color: #cbd5e1;
+      font-size: 14px;
+      margin: 12px 0 7px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .btn {
+      flex: 0 0 auto;
+      border-radius: 15px;
+      padding: 12px 14px;
+      color: var(--text);
+      background: #1e293b;
+      transition: 0.18s;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: #334155;
+    }
+
+    .btn-primary,
+    .btn-danger {
+      width: 100%;
+      margin-top: 12px;
+      border-radius: 16px;
+      padding: 13px 14px;
+      font-weight: 700;
+    }
+
+    .btn-primary {
+      background: var(--cyan);
+      color: #020617;
+    }
+
+    .btn-danger {
+      background: var(--rose);
+      color: white;
+    }
+
+    .status-box,
+    .users-box,
+    .feature-box {
+      margin-top: 14px;
+      border-radius: 20px;
+      padding: 14px;
+      background: #020617;
+      border: 1px solid var(--border);
+      overflow-wrap: anywhere;
+    }
+
+    .status-head,
+    .user-item,
+    .chat-head,
+    .head-actions {
+      display: flex;
+      align-items: center;
+    }
+
+    .status-head,
+    .user-item,
+    .chat-head {
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .pill {
+      flex: 0 0 auto;
+      font-size: 12px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      color: #cbd5e1;
+      background: #334155;
+    }
+
+    .pill.online {
+      background: rgba(16, 185, 129, 0.16);
+      color: #6ee7b7;
+    }
+
+    .small-id {
+      color: #64748b;
+      font-size: 12px;
+      word-break: break-all;
+      margin-top: 8px;
+    }
+
+    .user-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .user-item {
+      padding: 9px 11px;
+      border-radius: 14px;
+      background: #0f172a;
+      font-size: 14px;
+      min-width: 0;
+    }
+
+    .user-item span:first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .host-tag {
+      color: #67e8f9;
+      font-size: 11px;
+      flex: 0 0 auto;
+    }
+
+    .feature-box {
+      background: linear-gradient(135deg, rgba(217, 70, 239, 0.12), rgba(34, 211, 238, 0.1));
+      border-color: rgba(217, 70, 239, 0.22);
+    }
+
+    .chat {
+      min-width: 0;
+      height: calc(100dvh - 28px);
+      min-height: 620px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-head {
+      flex: 0 0 auto;
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chat-title {
+      min-width: 0;
+    }
+
+    .chat-title p {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
+    .head-actions {
+      gap: 10px;
+      flex: 0 0 auto;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: #475569;
+      flex: 0 0 auto;
+    }
+
+    .dot.online {
+      background: var(--green);
+      box-shadow: 0 0 18px rgba(52, 211, 153, 0.75);
+    }
+
+    .panel {
+      flex: 0 0 auto;
+      display: none;
+      padding: 13px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(2, 6, 23, 0.75);
+      max-height: 38dvh;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .panel.open {
+      display: block;
+    }
+
+    .tabs,
+    .pack-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 3px;
+      scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar,
+    .pack-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tabs {
+      margin-bottom: 13px;
+    }
+
+    .tab,
+    .pack-btn {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 9px 12px;
+      color: #cbd5e1;
+      background: #1e293b;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    .tab.active.cyan {
+      background: var(--cyan);
+      color: #020617;
+      font-weight: 700;
+    }
+
+    .tab.active.pink,
+    .pack-btn.active {
+      background: var(--pink);
+      color: white;
+      font-weight: 700;
+    }
+
+    .tab.active.amber {
+      background: var(--amber);
+      color: #020617;
+      font-weight: 700;
+    }
+
+    .icon-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
+    .icon-btn {
+      min-width: 0;
+      height: 43px;
+      border-radius: 14px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      font-size: 23px;
+      color: white;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.14);
+    }
+
+    .sticker-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+      gap: 9px;
+      width: 100%;
+    }
+
+    .sticker-btn {
+      min-width: 0;
+      min-height: 82px;
+      border-radius: 20px;
+      color: white;
+      font-size: 34px;
+      border: 1px solid #334155;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+    }
+
+    .sticker-btn:hover {
+      border-color: #f0abfc;
+      background: linear-gradient(135deg, rgba(217, 70, 239, 0.22), rgba(34, 211, 238, 0.14));
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+    }
+
+    .quick-btn {
+      min-width: 0;
+      text-align: left;
+      border-radius: 14px;
+      padding: 13px;
+      color: var(--text);
+      background: #0f172a;
+      border: 1px solid var(--border);
+      overflow-wrap: anywhere;
+    }
+
+    .messages {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overscroll-behavior: contain;
+    }
+
+    .empty {
+      flex: 1;
+      min-height: 260px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: #64748b;
+      padding: 24px;
+    }
+
+    .msg-wrap {
+      display: flex;
+      max-width: 100%;
+      animation: pop 0.18s ease-out;
+    }
+
+    .msg-wrap.mine {
+      justify-content: flex-end;
+    }
+
+    .msg-wrap.other {
+      justify-content: flex-start;
+    }
+
+    .msg-wrap.system {
+      justify-content: center;
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .bubble,
+    .sticker-bubble {
+      max-width: min(78%, 520px);
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .bubble {
+      border-radius: 20px;
+      padding: 11px 14px;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
+      background: #1e293b;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    .mine .bubble {
+      background: var(--cyan);
+      color: #020617;
+    }
+
+    .meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 5px;
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0.78;
+      min-width: 0;
+    }
+
+    .meta span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .time {
+      flex: 0 0 auto;
+      font-size: 11px;
+      opacity: 0.65;
+      font-weight: 400;
+    }
+
+    .system-text {
+      display: inline-block;
+      max-width: 92%;
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 12px;
+      color: var(--muted);
+      background: #020617;
+      border: 1px solid var(--border);
+      overflow-wrap: anywhere;
+    }
+
+    .sticker-bubble {
+      border-radius: 30px;
+      padding: 14px 16px;
+      border: 1px solid rgba(240, 171, 252, 0.35);
+      background: linear-gradient(135deg, #1e293b, #312e81);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+    }
+
+    .mine .sticker-bubble {
+      border-color: rgba(103, 232, 249, 0.45);
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.28), rgba(217, 70, 239, 0.24));
+    }
+
+    .sticker-big {
+      font-size: clamp(42px, 13vw, 68px);
+      line-height: 1.05;
+      text-align: center;
+      padding: 7px 10px;
+      filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.25));
+    }
+
+    .composer {
+      flex: 0 0 auto;
+      padding: 12px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      background: rgba(2, 6, 23, 0.88);
+    }
+
+    .composer .row {
+      align-items: center;
+    }
+
+    .send-btn {
+      flex: 0 0 auto;
+      min-width: 74px;
+      border-radius: 15px;
+      padding: 13px 14px;
+      color: #020617;
+      background: var(--cyan);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .desktop-only {
+      display: inline;
+    }
+
+    @media (max-width: 760px) {
+      .app {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 8px;
+      }
+
+      .card {
+        border-radius: 20px;
+      }
+
+      .sidebar {
+        padding: 12px;
+      }
+
+      .brand {
+        margin-bottom: 10px;
+      }
+
+      .logo {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        font-size: 20px;
+      }
+
+      h1 {
+        font-size: 18px;
+      }
+
+      label {
+        margin-top: 9px;
+      }
+
+      .status-box,
+      .users-box,
+      .feature-box {
+        margin-top: 10px;
+        padding: 11px;
+        border-radius: 17px;
+      }
+
+      .feature-box,
+      .small-id {
+        display: none;
+      }
+
+      .users-box {
+        max-height: 110px;
+        overflow-y: auto;
+      }
+
+      .chat {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+        border-radius: 20px;
+      }
+
+      .chat-head {
+        padding: 12px;
+      }
+
+      .head-actions {
+        gap: 7px;
+      }
+
+      .desktop-only,
+      .panel-word {
+        display: none;
+      }
+
+      .btn,
+      .send-btn {
+        padding: 12px;
+      }
+
+      .panel {
+        max-height: 34dvh;
+        padding: 11px;
+      }
+
+      .tab,
+      .pack-btn {
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
+      .icon-grid {
+        grid-template-columns: repeat(auto-fill, minmax(39px, 1fr));
+        gap: 7px;
+      }
+
+      .icon-btn {
+        height: 40px;
+        font-size: 22px;
+      }
+
+      .sticker-grid {
+        grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+        gap: 8px;
+      }
+
+      .sticker-btn {
+        min-height: 76px;
+        font-size: 31px;
+      }
+
+      .quick-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .messages {
+        padding: 12px;
+        gap: 10px;
+      }
+
+      .bubble,
+      .sticker-bubble {
+        max-width: 86%;
+      }
+
+      .bubble {
+        padding: 10px 12px;
+        border-radius: 18px;
+      }
+
+      .sticker-bubble {
+        padding: 12px 13px;
+        border-radius: 24px;
+      }
+
+      .composer {
+        padding: 9px;
+        padding-bottom: max(9px, env(safe-area-inset-bottom));
+      }
+
+      .composer .row {
+        gap: 7px;
+      }
+
+      .send-btn {
+        min-width: 52px;
+      }
+
+      .send-text {
+        display: none;
+      }
+    }
+
+    @media (max-width: 390px) {
+      .app {
+        padding: 6px;
+      }
+
+      .sidebar {
+        padding: 10px;
+      }
+
+      .chat-head {
+        padding: 10px;
+      }
+
+      .panel {
+        padding: 9px;
+      }
+
+      .messages {
+        padding: 10px;
+      }
+
+      .bubble,
+      .sticker-bubble {
+        max-width: 90%;
+      }
+
+      .icon-grid {
+        grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+      }
+
+      .icon-btn {
+        height: 38px;
+        font-size: 20px;
+      }
+
+      .sticker-grid {
+        grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="card sidebar">
+      <div class="brand">
+        <div class="logo" id="wifiIcon">📴</div>
+        <div>
+          <h1>PeerJS Room Chat</h1>
+          <p class="muted">Chat bằng mã phòng</p>
+        </div>
+      </div>
+
+      <label for="nameInput">Tên của bạn</label>
+      <input id="nameInput" placeholder="Nhập tên" />
+
+      <label for="roomInput">Mã phòng</label>
+      <div class="row">
+        <input id="roomInput" placeholder="vd: lop7a" />
+        <button class="btn" id="copyBtn" title="Copy mã phòng">📋</button>
+      </div>
+
+      <button class="btn-primary" id="joinBtn">🚪 Vào / tạo phòng</button>
+      <button class="btn-danger hidden" id="leaveBtn">🏃 Rời phòng</button>
+
+      <div class="status-box">
+        <div class="status-head">
+          <span class="muted">Trạng thái</span>
+          <span class="pill" id="onlinePill">Offline</span>
+        </div>
+        <p id="statusText">Chưa vào phòng</p>
+        <p class="small-id hidden" id="peerIdText"></p>
+        <p class="small-id hidden" id="hostIdText"></p>
+      </div>
+
+      <div class="users-box">
+        <p>👥 Online (<span id="userCount">0</span>)</p>
+        <div class="user-list" id="userList">
+          <p class="muted">Chưa có ai trong phòng.</p>
+        </div>
+      </div>
+
+      <div class="feature-box">
+        <p><b>✨ Tính năng</b></p>
+        <p class="muted" style="margin-top: 8px;">Gửi icon độc lạ, sticker lớn, tin nhắn nhanh và bong bóng đẹp.</p>
+      </div>
+    </aside>
+
+    <main class="card chat">
+      <div class="chat-head">
+        <div class="chat-title">
+          <h2>Tin nhắn</h2>
+          <p class="muted">Phòng: <span id="roomLabel">chưa có</span></p>
+        </div>
+        <div class="head-actions">
+          <button class="btn" id="panelBtn">✨ <span class="panel-word">Sticker</span></button>
+          <div class="dot" id="onlineDot"></div>
+        </div>
+      </div>
+
+      <section class="panel" id="panel">
+        <div class="tabs">
+          <button class="tab active cyan" data-tab="icons">😊 Icon</button>
+          <button class="tab" data-tab="stickers">🏷️ Sticker</button>
+          <button class="tab" data-tab="quick">🪄 Nhanh</button>
+        </div>
+
+        <div id="iconsPanel" class="icon-grid"></div>
+        <div id="stickersPanel" class="hidden">
+          <div class="pack-row" id="packRow"></div>
+          <div class="sticker-grid" id="stickerGrid"></div>
+        </div>
+        <div id="quickPanel" class="quick-grid hidden"></div>
+      </section>
+
+      <section class="messages" id="messages">
+        <div class="empty" id="emptyState">Nhập mã phòng rồi bắt đầu nhắn tin.</div>
+      </section>
+
+      <section class="composer">
+        <div class="row">
+          <button class="btn" id="emojiBtn">😊</button>
+          <input id="messageInput" placeholder="Vào phòng trước" disabled />
+          <button class="send-btn" id="sendBtn" disabled>➤ <span class="send-text">Gửi</span></button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const weirdIcons = [
+      "🪩", "🧿", "🫧", "🛸", "🪬", "🧃", "🦄", "🐉", "🦖", "🦕", "🫨", "🤯",
+      "😈", "👽", "🤖", "🧌", "🧙", "🧛", "🧟", "🥷", "🫰", "🫶", "🫵", "🤌",
+      "💥", "💫", "🌪️", "🔥", "⚡", "☄️", "🌈", "🌙", "⭐", "🍄", "🌵", "🌊",
+      "🍕", "🍟", "🍜", "🍣", "🍩", "🍭", "🥤", "🧋", "🎮", "🎧", "🎲", "🎯",
+      "🚀", "🏆", "💎", "🔮", "🧸", "🎁", "🪄", "🧨", "🦾", "👑", "🕶️", "💀"
+    ];
+
+    const stickerPacks = [
+      { id: "cool", name: "Ngầu", items: ["😎🔥", "👑✨", "🕶️💥", "💎🧊", "🚀🌙", "⚡😈"] },
+      { id: "cute", name: "Dễ thương", items: ["🥺👉👈", "🐣💛", "🧸💕", "🌷😊", "🐰🍓", "🫶✨"] },
+      { id: "meme", name: "Meme", items: ["💀💀💀", "🤡🎪", "🗿☕", "🤯📈", "😭👌", "😼📸"] },
+      { id: "vibe", name: "Vibe", items: ["🌌🪐", "🌊🫧", "🍄🌈", "☄️💫", "🪩🎧", "🌙⭐"] },
+      { id: "battle", name: "Chiến", items: ["⚔️🔥", "🛡️👊", "🐉⚡", "🥷🌑", "🏆💥", "🧨😈"] },
+      { id: "love", name: "Tim", items: ["💖✨", "💘🥺", "💞🫶", "❤️‍🔥😳", "💕🌷", "💝🎁"] }
+    ];
+
+    const quickTexts = [
+      "Hello cả phòng 👋",
+      "Ai online không? 👀",
+      "Quá cháy luôn 🔥",
+      "Từ từ để mình rep 😭",
+      "Ok nè ✅",
+      "Haha vui quá 🤣"
+    ];
+
+    const state = {
+      peer: null,
+      conns: {},
+      isHost: false,
+      joined: false,
+      online: false,
+      activePack: "cool",
+      myName: "User-" + Math.floor(Math.random() * 900 + 100),
+      roomCode: ""
+    };
+
+    const els = {
+      wifiIcon: document.getElementById("wifiIcon"),
+      nameInput: document.getElementById("nameInput"),
+      roomInput: document.getElementById("roomInput"),
+      copyBtn: document.getElementById("copyBtn"),
+      joinBtn: document.getElementById("joinBtn"),
+      leaveBtn: document.getElementById("leaveBtn"),
+      onlinePill: document.getElementById("onlinePill"),
+      statusText: document.getElementById("statusText"),
+      peerIdText: document.getElementById("peerIdText"),
+      hostIdText: document.getElementById("hostIdText"),
+      userCount: document.getElementById("userCount"),
+      userList: document.getElementById("userList"),
+      roomLabel: document.getElementById("roomLabel"),
+      panelBtn: document.getElementById("panelBtn"),
+      panel: document.getElementById("panel"),
+      onlineDot: document.getElementById("onlineDot"),
+      iconsPanel: document.getElementById("iconsPanel"),
+      stickersPanel: document.getElementById("stickersPanel"),
+      quickPanel: document.getElementById("quickPanel"),
+      packRow: document.getElementById("packRow"),
+      stickerGrid: document.getElementById("stickerGrid"),
+      messages: document.getElementById("messages"),
+      emojiBtn: document.getElementById("emojiBtn"),
+      messageInput: document.getElementById("messageInput"),
+      sendBtn: document.getElementById("sendBtn")
+    };
+
+    function normalizeRoomCode(value) {
+      return String(value || "").trim().toLowerCase().replace(/[^a-z0-9-_]/g, "").slice(0, 24);
+    }
+
+    function makeHostId(code) {
+      return "room-" + code + "-host";
+    }
+
+    function uid() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return "msg-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function runSelfTests() {
+      const tests = [
+        { input: " Lớp 7A!! ", expected: "lp7a" },
+        { input: "room_123-abc", expected: "room_123-abc" },
+        { input: "ABC DEF", expected: "abcdef" },
+        { input: "012345678901234567890123456789", expected: "012345678901234567890123" }
+      ];
+
+      tests.forEach((test) => {
+        const actual = normalizeRoomCode(test.input);
+        console.assert(actual === test.expected, "normalizeRoomCode failed", test, actual);
+      });
+
+      console.assert(makeHostId("abc") === "room-abc-host", "makeHostId failed");
+      console.assert(stickerPacks.every((pack) => pack.items.length >= 6), "Sticker packs need at least 6 stickers");
+      console.assert(document.querySelector(".app"), "App container should exist");
+      console.assert(getComputedStyle(document.documentElement).overflowX !== "scroll", "Page should not force horizontal scroll");
+    }
+
+    function setStatus(text) {
+      els.statusText.textContent = text;
+    }
+
+    function setOnline(value) {
+      state.online = value;
+      els.wifiIcon.textContent = value ? "📶" : "📴";
+      els.onlinePill.textContent = value ? "Online" : "Offline";
+      els.onlinePill.classList.toggle("online", value);
+      els.onlineDot.classList.toggle("online", value);
+    }
+
+    function setJoined(value) {
+      state.joined = value;
+      els.joinBtn.classList.toggle("hidden", value);
+      els.leaveBtn.classList.toggle("hidden", !value);
+      els.nameInput.disabled = value;
+      els.roomInput.disabled = value;
+      els.messageInput.disabled = !value;
+      els.sendBtn.disabled = !value || !els.messageInput.value.trim();
+      els.messageInput.placeholder = value ? "Nhập tin nhắn..." : "Vào phòng trước";
+      renderStickers();
+      renderQuickTexts();
+    }
+
+    function setPeerId(id) {
+      if (id) {
+        els.peerIdText.textContent = "ID: " + id;
+        els.peerIdText.classList.remove("hidden");
+      } else {
+        els.peerIdText.textContent = "";
+        els.peerIdText.classList.add("hidden");
+      }
+    }
+
+    function setHostId(id) {
+      if (id) {
+        els.hostIdText.textContent = "Host: " + id;
+        els.hostIdText.classList.remove("hidden");
+      } else {
+        els.hostIdText.textContent = "";
+        els.hostIdText.classList.add("hidden");
+      }
+    }
+
+    function clearMessages() {
+      els.messages.innerHTML = '<div class="empty" id="emptyState">Nhập mã phòng rồi bắt đầu nhắn tin.</div>';
+    }
+
+    function addMessage(msg) {
+      const empty = document.getElementById("emptyState");
+      if (empty) empty.remove();
+
+      const wrap = document.createElement("div");
+      wrap.className = "msg-wrap " + (msg.type === "system" ? "system" : msg.mine ? "mine" : "other");
+      wrap.dataset.id = uid();
+
+      if (msg.type === "system") {
+        wrap.innerHTML = `<span class="system-text">${escapeHtml(msg.text)}</span>`;
+      } else if (msg.type === "sticker") {
+        wrap.innerHTML = `
+          <div class="sticker-bubble">
+            <div class="meta">
+              <span>${escapeHtml(msg.from)}</span>
+              <span class="time">${escapeHtml(msg.time || currentTime())}</span>
+              <span>💖</span>
+            </div>
+            <div class="sticker-big">${escapeHtml(msg.text)}</div>
+          </div>
+        `;
+      } else {
+        wrap.innerHTML = `
+          <div class="bubble">
+            <div class="meta">
+              <span>${escapeHtml(msg.from)}</span>
+              <span class="time">${escapeHtml(msg.time || currentTime())}</span>
+            </div>
+            <div>${escapeHtml(msg.text)}</div>
+          </div>
+        `;
+      }
+
+      els.messages.appendChild(wrap);
+      requestAnimationFrame(() => {
+        els.messages.scrollTo({ top: els.messages.scrollHeight, behavior: "smooth" });
+      });
+    }
+
+    function currentTime() {
+      return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function broadcast(data, exceptPeerId) {
+      Object.entries(state.conns).forEach(([id, conn]) => {
+        if (id !== exceptPeerId && conn.open) conn.send(data);
+      });
+    }
+
+    function getUsers() {
+      return [
+        { id: state.peer ? state.peer.id : "", name: state.myName, host: state.isHost },
+        ...Object.values(state.conns)
+          .filter((conn) => conn.open && conn.metadata && conn.metadata.name)
+          .map((conn) => ({ id: conn.peer, name: conn.metadata.name, host: false }))
+      ];
+    }
+
+    function renderUsers(users) {
+      els.userCount.textContent = users.length;
+      if (!users.length) {
+        els.userList.innerHTML = `<p class="muted">Chưa có ai trong phòng.</p>`;
+        return;
+      }
+
+      els.userList.innerHTML = users.map((u) => `
+        <div class="user-item">
+          <span>${escapeHtml(u.name)}</span>
+          ${u.host ? '<span class="host-tag">host</span>' : ''}
+        </div>
+      `).join("");
+    }
+
+    function updateUsers() {
+      const users = getUsers();
+      renderUsers(users);
+      if (state.isHost) broadcast({ type: "users", users }, null);
+    }
+
+    function setupConnection(conn) {
+      state.conns[conn.peer] = conn;
+
+      conn.on("open", () => {
+        setOnline(true);
+        addMessage({ type: "system", text: (conn.metadata && conn.metadata.name ? conn.metadata.name : conn.peer) + " đã online." });
+        updateUsers();
+
+        if (!state.isHost) {
+          conn.send({ type: "hello", name: state.myName });
+        } else {
+          conn.send({ type: "users", users: getUsers() });
+        }
+      });
+
+      conn.on("data", (data) => {
+        if (!data || typeof data !== "object") return;
+
+        if (data.type === "chat" || data.type === "sticker") {
+          addMessage({
+            type: data.type,
+            from: data.from,
+            text: data.text,
+            mine: false,
+            time: currentTime()
+          });
+
+          if (state.isHost) broadcast(data, conn.peer);
+        }
+
+        if (data.type === "hello") {
+          conn.metadata = { ...(conn.metadata || {}), name: data.name };
+          updateUsers();
+        }
+
+        if (data.type === "users") {
+          renderUsers(data.users || []);
+        }
+      });
+
+      conn.on("close", () => {
+        addMessage({ type: "system", text: (conn.metadata && conn.metadata.name ? conn.metadata.name : conn.peer) + " đã offline." });
+        delete state.conns[conn.peer];
+        updateUsers();
+      });
+
+      conn.on("error", () => {
+        addMessage({ type: "system", text: "Kết nối gặp lỗi." });
+      });
+    }
+
+    function joinRoom() {
+      const code = normalizeRoomCode(els.roomInput.value);
+      if (!code) {
+        setStatus("Nhập mã phòng trước đã nhé.");
+        return;
+      }
+
+      if (!window.Peer) {
+        setStatus("Không tải được PeerJS. Hãy kiểm tra mạng hoặc CDN.");
+        return;
+      }
+
+      state.roomCode = code;
+      state.myName = els.nameInput.value.trim() || state.myName;
+      els.nameInput.value = state.myName;
+      els.roomInput.value = code;
+      els.roomLabel.textContent = code;
+      clearMessages();
+      renderUsers([]);
+      state.conns = {};
+
+      const fixedHostId = makeHostId(code);
+      setHostId(fixedHostId);
+      setStatus("Đang vào phòng...");
+
+      const peer = new Peer(fixedHostId, { debug: 1 });
+      state.peer = peer;
+
+      peer.on("open", (id) => {
+        state.isHost = true;
+        setPeerId(id);
+        setJoined(true);
+        setOnline(true);
+        setStatus("Bạn đang là chủ phòng: " + code);
+        addMessage({ type: "system", text: "Đã tạo phòng " + code + ". Người khác nhập cùng mã để chat." });
+        updateUsers();
+        els.messageInput.focus({ preventScroll: true });
+      });
+
+      peer.on("connection", setupConnection);
+
+      peer.on("error", (err) => {
+        if (err.type === "unavailable-id") {
+          peer.destroy();
+          state.isHost = false;
+
+          const clientPeer = new Peer(undefined, { debug: 1 });
+          state.peer = clientPeer;
+
+          clientPeer.on("open", (id) => {
+            setPeerId(id);
+            setJoined(true);
+            setOnline(true);
+            setStatus("Đã vào phòng: " + code);
+            const conn = clientPeer.connect(fixedHostId, {
+              reliable: true,
+              metadata: { name: state.myName }
+            });
+            setupConnection(conn);
+            addMessage({ type: "system", text: "Đã kết nối tới phòng " + code + "." });
+            els.messageInput.focus({ preventScroll: true });
+          });
+
+          clientPeer.on("error", () => {
+            setOnline(false);
+            setStatus("Không kết nối được phòng. Hãy thử lại hoặc tạo mã khác.");
+          });
+        } else {
+          setOnline(false);
+          setStatus("Lỗi PeerJS: " + (err.type || "không rõ"));
+        }
+      });
+    }
+
+    function leaveRoom() {
+      Object.values(state.conns).forEach((conn) => conn.close());
+      state.conns = {};
+      if (state.peer) state.peer.destroy();
+      state.peer = null;
+      state.isHost = false;
+      setJoined(false);
+      setOnline(false);
+      setPeerId("");
+      setHostId("");
+      renderUsers([]);
+      els.panel.classList.remove("open");
+      setStatus("Đã rời phòng");
+    }
+
+    function sendPayload(payload) {
+      if (!state.joined) return;
+
+      addMessage({ ...payload, mine: true, time: currentTime() });
+
+      const networkPayload = {
+        type: payload.type,
+        from: state.myName,
+        text: payload.text,
+        stickerPack: payload.stickerPack
+      };
+
+      if (state.isHost) {
+        broadcast(networkPayload, null);
+      } else {
+        const hostConn = Object.values(state.conns)[0];
+        if (hostConn && hostConn.open) {
+          hostConn.send(networkPayload);
+        } else {
+          addMessage({ type: "system", text: "Chưa có kết nối tới chủ phòng." });
+        }
+      }
+    }
+
+    function sendMessage() {
+      const text = els.messageInput.value.trim();
+      if (!text || !state.joined) return;
+      sendPayload({ type: "chat", from: state.myName, text });
+      els.messageInput.value = "";
+      els.sendBtn.disabled = true;
+    }
+
+    function sendSticker(text, packId) {
+      if (!state.joined) return;
+      sendPayload({ type: "sticker", from: state.myName, text, stickerPack: packId });
+    }
+
+    function renderIcons() {
+      els.iconsPanel.innerHTML = weirdIcons.map((icon) => `
+        <button class="icon-btn" data-icon="${escapeHtml(icon)}">${escapeHtml(icon)}</button>
+      `).join("");
+
+      els.iconsPanel.querySelectorAll(".icon-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          els.messageInput.value += (els.messageInput.value ? " " : "") + btn.dataset.icon;
+          els.messageInput.focus({ preventScroll: true });
+          els.sendBtn.disabled = !state.joined || !els.messageInput.value.trim();
+        });
+      });
+    }
+
+    function renderPacks() {
+      els.packRow.innerHTML = stickerPacks.map((pack) => `
+        <button class="pack-btn ${pack.id === state.activePack ? "active" : ""}" data-pack="${pack.id}">${escapeHtml(pack.name)}</button>
+      `).join("");
+
+      els.packRow.querySelectorAll(".pack-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.activePack = btn.dataset.pack;
+          renderPacks();
+          renderStickers();
+        });
+      });
+    }
+
+    function renderStickers() {
+      const pack = stickerPacks.find((item) => item.id === state.activePack) || stickerPacks[0];
+      els.stickerGrid.innerHTML = pack.items.map((sticker) => `
+        <button class="sticker-btn" data-sticker="${escapeHtml(sticker)}" ${state.joined ? "" : "disabled"}>${escapeHtml(sticker)}</button>
+      `).join("");
+
+      els.stickerGrid.querySelectorAll(".sticker-btn").forEach((btn) => {
+        btn.addEventListener("click", () => sendSticker(btn.dataset.sticker, pack.id));
+      });
+    }
+
+    function renderQuickTexts() {
+      els.quickPanel.innerHTML = quickTexts.map((text) => `
+        <button class="quick-btn" data-text="${escapeHtml(text)}" ${state.joined ? "" : "disabled"}>${escapeHtml(text)}</button>
+      `).join("");
+
+      els.quickPanel.querySelectorAll(".quick-btn").forEach((btn) => {
+        btn.addEventListener("click", () => sendPayload({ type: "chat", from: state.myName, text: btn.dataset.text }));
+      });
+    }
+
+    function showTab(tabName) {
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.classList.remove("active", "cyan", "pink", "amber");
+        if (tab.dataset.tab === tabName) {
+          tab.classList.add("active");
+          if (tabName === "icons") tab.classList.add("cyan");
+          if (tabName === "stickers") tab.classList.add("pink");
+          if (tabName === "quick") tab.classList.add("amber");
+        }
+      });
+
+      els.iconsPanel.classList.toggle("hidden", tabName !== "icons");
+      els.stickersPanel.classList.toggle("hidden", tabName !== "stickers");
+      els.quickPanel.classList.toggle("hidden", tabName !== "quick");
+    }
+
+    function copyRoom() {
+      const code = normalizeRoomCode(els.roomInput.value);
+      if (!code) return;
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(code)
+          .then(() => addMessage({ type: "system", text: "Đã copy mã phòng: " + code }))
+          .catch(() => addMessage({ type: "system", text: "Mã phòng của bạn: " + code }));
+      } else {
+        addMessage({ type: "system", text: "Mã phòng của bạn: " + code });
+      }
+    }
+
+    function boot() {
+      runSelfTests();
+      els.nameInput.value = state.myName;
+
+      renderIcons();
+      renderPacks();
+      renderStickers();
+      renderQuickTexts();
+
+      els.roomInput.addEventListener("input", () => {
+        els.roomInput.value = normalizeRoomCode(els.roomInput.value);
+        els.roomLabel.textContent = els.roomInput.value || "chưa có";
+      });
+
+      els.roomInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !state.joined) joinRoom();
+      });
+
+      els.messageInput.addEventListener("input", () => {
+        els.sendBtn.disabled = !state.joined || !els.messageInput.value.trim();
+      });
+
+      els.messageInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+
+      els.joinBtn.addEventListener("click", joinRoom);
+      els.leaveBtn.addEventListener("click", leaveRoom);
+      els.sendBtn.addEventListener("click", sendMessage);
+      els.copyBtn.addEventListener("click", copyRoom);
+      els.panelBtn.addEventListener("click", () => els.panel.classList.toggle("open"));
+      els.emojiBtn.addEventListener("click", () => els.panel.classList.toggle("open"));
+
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => showTab(tab.dataset.tab));
+      });
+    }
+
+    boot();
+  </script>
+</body>
+</html>
     }
 
     button:disabled {
